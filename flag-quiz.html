@@ -2,26 +2,25 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Guess the Country by Flag</title>
+<title>Flag Memory Game</title>
 
-<!-- Mobile responsiveness -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
     body {
+        margin: 0;
         font-family: Arial, sans-serif;
         background: #f5f5f5;
         display: flex;
         justify-content: center;
         padding: 20px;
-        margin: 0;
     }
 
     #container {
         background: white;
         padding: 20px;
-        width: 95%;
-        max-width: 500px;
+        width: 100%;
+        max-width: 420px;
         border-radius: 12px;
         box-shadow: 0 0 12px rgba(0,0,0,.1);
         text-align: center;
@@ -31,71 +30,63 @@
         margin-top: 0;
     }
 
-    img {
+    #grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-top: 15px;
+    }
+
+    .card {
+        background: #3498db;
+        height: 80px;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        color: white;
+        position: relative;
+    }
+
+    .card img {
         width: 100%;
-        max-width: 320px;
-        height: 200px;
-        object-fit: contain;
-        border: 1px solid #ccc;
-        border-radius: 6px;
-        margin: 15px auto;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 8px;
+        display: none;
+    }
+
+    .card.flipped img,
+    .card.matched img {
         display: block;
     }
 
-    .option-btn {
-        width: 100%;
-        padding: 12px;
-        margin: 8px 0;
-        font-size: 16px;
-        background: #eee;
-        border: 1px solid #999;
-        border-radius: 8px;
-        cursor: pointer;
-    }
-
-    .option-btn:hover {
-        background: #ddd;
-    }
-
-    .option-btn:disabled {
+    .card.flipped,
+    .card.matched {
+        background: #fff;
         cursor: default;
-        opacity: 0.9;
     }
 
-    .correct {
-        background-color: #4CAF50 !important;
-        color: white !important;
-    }
-
-    .incorrect {
-        background-color: #e74c3c !important;
-        color: white !important;
-    }
-
-    #question-number {
-        font-weight: bold;
-        margin-top: 10px;
-    }
-
-    #final-score {
-        font-size: 22px;
-        font-weight: bold;
+    #status {
         margin-top: 15px;
+        font-weight: bold;
     }
 
-    #restart {
+    button {
         margin-top: 15px;
-        padding: 10px 20px;
+        padding: 10px 18px;
         font-size: 16px;
-        border-radius: 8px;
         border: none;
-        background: #3498db;
+        border-radius: 8px;
+        background: #2ecc71;
         color: white;
         cursor: pointer;
     }
 
-    #restart:hover {
-        background: #2980b9;
+    button:hover {
+        background: #27ae60;
     }
 </style>
 </head>
@@ -103,115 +94,100 @@
 <body>
 
 <div id="container">
-    <h2>Guess the Country by Flag 🇺🇳</h2>
+    <h2>Flag Memory Game 🌍</h2>
 
-    <img id="flag" alt="Country Flag">
+    <div id="grid"></div>
 
-    <div id="question-number"></div>
+    <div id="status"></div>
 
-    <div id="options"></div>
-
-    <div id="final-score"></div>
-
-    <button id="restart" style="display:none;" onclick="startQuiz()">Restart Quiz</button>
+    <button onclick="startGame()">Restart Game</button>
 </div>
 
 <script>
-/* -------- CONFIG -------- */
-const QUESTIONS = 10;
-
-let index = 0;
-let score = 0;
-let quizCountries = [];
-
-/* -------- COUNTRY DATA -------- */
-const countries = [
-    { name: "France", flag: "https://flagcdn.com/w320/fr.png" },
-    { name: "Germany", flag: "https://flagcdn.com/w320/de.png" },
-    { name: "Japan", flag: "https://flagcdn.com/w320/jp.png" },
-    { name: "Brazil", flag: "https://flagcdn.com/w320/br.png" },
-    { name: "Canada", flag: "https://flagcdn.com/w320/ca.png" },
-    { name: "India", flag: "https://flagcdn.com/w320/in.png" },
-    { name: "Italy", flag: "https://flagcdn.com/w320/it.png" },
-    { name: "Australia", flag: "https://flagcdn.com/w320/au.png" },
-    { name: "Mexico", flag: "https://flagcdn.com/w320/mx.png" },
-    { name: "South Africa", flag: "https://flagcdn.com/w320/za.png" }
+/* -------- FLAG DATA -------- */
+const flags = [
+    { name: "France", img: "https://flagcdn.com/w320/fr.png" },
+    { name: "Germany", img: "https://flagcdn.com/w320/de.png" },
+    { name: "Japan", img: "https://flagcdn.com/w320/jp.png" },
+    { name: "Brazil", img: "https://flagcdn.com/w320/br.png" },
+    { name: "India", img: "https://flagcdn.com/w320/in.png" },
+    { name: "Italy", img: "https://flagcdn.com/w320/it.png" }
 ];
 
-/* -------- START QUIZ -------- */
-function startQuiz() {
-    index = 0;
-    score = 0;
-    quizCountries = shuffle([...countries]).slice(0, QUESTIONS);
+let firstCard = null;
+let secondCard = null;
+let lockBoard = false;
+let matches = 0;
 
-    document.getElementById("final-score").textContent = "";
-    document.getElementById("restart").style.display = "none";
+/* -------- START GAME -------- */
+function startGame() {
+    const grid = document.getElementById("grid");
+    grid.innerHTML = "";
+    matches = 0;
+    firstCard = null;
+    secondCard = null;
+    lockBoard = false;
+    document.getElementById("status").textContent = "";
 
-    loadQuestion();
-}
+    const cards = shuffle([...flags, ...flags]);
 
-/* -------- LOAD QUESTION -------- */
-function loadQuestion() {
-    const current = quizCountries[index];
+    cards.forEach(flag => {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.dataset.name = flag.name;
 
-    document.getElementById("question-number").textContent =
-        `Question ${index + 1} of ${QUESTIONS}`;
+        const img = document.createElement("img");
+        img.src = flag.img;
 
-    document.getElementById("flag").src = current.flag;
-
-    createOptions(current);
-}
-
-/* -------- CREATE OPTIONS -------- */
-function createOptions(correctCountry) {
-    const optionsDiv = document.getElementById("options");
-    optionsDiv.innerHTML = "";
-
-    const incorrect = shuffle(
-        countries.filter(c => c.name !== correctCountry.name)
-    ).slice(0, 3);
-
-    const options = shuffle([correctCountry, ...incorrect]);
-
-    options.forEach(opt => {
-        const btn = document.createElement("button");
-        btn.className = "option-btn";
-        btn.textContent = opt.name;
-        btn.onclick = () => handleAnswer(btn, opt.name, correctCountry.name);
-        optionsDiv.appendChild(btn);
+        card.appendChild(img);
+        card.addEventListener("click", () => flipCard(card));
+        grid.appendChild(card);
     });
 }
 
-/* -------- HANDLE ANSWER -------- */
-function handleAnswer(button, chosen, correct) {
-    const buttons = document.querySelectorAll(".option-btn");
-    buttons.forEach(b => b.disabled = true);
+/* -------- FLIP CARD -------- */
+function flipCard(card) {
+    if (lockBoard || card.classList.contains("flipped") || card.classList.contains("matched")) return;
 
-    if (chosen === correct) {
-        button.classList.add("correct");
-        score++;
-    } else {
-        button.classList.add("incorrect");
-        [...buttons]
-            .find(b => b.textContent === correct)
-            .classList.add("correct");
+    card.classList.add("flipped");
+
+    if (!firstCard) {
+        firstCard = card;
+        return;
     }
 
-    setTimeout(() => {
-        index++;
-        index >= QUESTIONS ? finishQuiz() : loadQuestion();
-    }, 1200);
+    secondCard = card;
+    checkMatch();
 }
 
-/* -------- FINISH QUIZ -------- */
-function finishQuiz() {
-    document.getElementById("final-score").textContent =
-        `Final Score: ${score} / ${QUESTIONS}`;
+/* -------- CHECK MATCH -------- */
+function checkMatch() {
+    lockBoard = true;
 
-    document.getElementById("restart").style.display = "inline-block";
-    document.getElementById("flag").src = "";
-    document.getElementById("options").innerHTML = "";
-    document.getElementById("question-number").textContent = "";
+    if (firstCard.dataset.name === secondCard.dataset.name) {
+        firstCard.classList.add("matched");
+        secondCard.classList.add("matched");
+        matches++;
+
+        resetTurn();
+
+        if (matches === flags.length) {
+            document.getElementById("status").textContent = "🎉 You matched all flags!";
+        }
+    } else {
+        setTimeout(() => {
+            firstCard.classList.remove("flipped");
+            secondCard.classList.remove("flipped");
+            resetTurn();
+        }, 800);
+    }
+}
+
+/* -------- RESET TURN -------- */
+function resetTurn() {
+    firstCard = null;
+    secondCard = null;
+    lockBoard = false;
 }
 
 /* -------- SHUFFLE -------- */
@@ -219,8 +195,8 @@ function shuffle(array) {
     return array.sort(() => Math.random() - 0.5);
 }
 
-/* -------- AUTO START -------- */
-startQuiz();
+/* -------- START ON LOAD -------- */
+startGame();
 </script>
 
 </body>
