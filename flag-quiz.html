@@ -3,225 +3,220 @@
 <head>
 <meta charset="UTF-8">
 <title>Guess the Country by Flag</title>
-
-<!-- Mobile responsiveness -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://unpkg.com/topojson@3"></script>
 
 <style>
     body {
         font-family: Arial, sans-serif;
-        background: #f5f5f5;
+        background: linear-gradient(135deg, #ff9a9e, #fad0c4);
         display: flex;
         justify-content: center;
-        padding: 20px;
+        padding: 40px 0;
         margin: 0;
     }
 
     #container {
         background: white;
-        padding: 20px;
-        width: 95%;
+        padding: 25px 20px;
+        width: 90%;
         max-width: 500px;
-        border-radius: 12px;
-        box-shadow: 0 0 12px rgba(0,0,0,.1);
+        border-radius: 15px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.2);
         text-align: center;
     }
 
     h2 {
         margin-top: 0;
+        color: #333;
     }
 
-    img {
-        width: 100%;
-        max-width: 320px;
-        height: 200px;
-        object-fit: contain;
-        border: 1px solid #ccc;
-        border-radius: 6px;
-        margin: 15px auto;
+    #map {
+        width: 350px;
+        height: 250px;
+        margin: 20px auto;
         display: block;
     }
 
     .option-btn {
-        width: 100%;
+        width: 90%;
         padding: 12px;
         margin: 8px 0;
         font-size: 16px;
-        background: #eee;
-        border: 1px solid #999;
-        border-radius: 8px;
+        border: none;
+        border-radius: 10px;
         cursor: pointer;
+        background: linear-gradient(to right, #6a11cb, #2575fc);
+        color: white;
+        transition: transform 0.2s, box-shadow 0.2s;
     }
 
     .option-btn:hover {
-        background: #ddd;
-    }
-
-    .option-btn:disabled {
-        cursor: default;
-        opacity: 0.9;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
     }
 
     .correct {
-        background-color: #4CAF50 !important;
+        background: #2ecc71 !important;
         color: white !important;
     }
 
     .incorrect {
-        background-color: #e74c3c !important;
+        background: #e74c3c !important;
         color: white !important;
-    }
-
-    #question-number {
-        font-weight: bold;
-        margin-top: 10px;
     }
 
     #final-score {
         font-size: 22px;
         font-weight: bold;
         margin-top: 15px;
+        color: #333;
     }
 
     #restart {
         margin-top: 15px;
-        padding: 10px 20px;
+        padding: 10px 18px;
         font-size: 16px;
-        border-radius: 8px;
         border: none;
-        background: #3498db;
+        border-radius: 10px;
+        background: #f39c12;
         color: white;
         cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
     }
 
     #restart:hover {
-        background: #2980b9;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
     }
 </style>
 </head>
 
 <body>
-
 <div id="container">
-    <h2>Guess the Country by Flag</h2>
-
-    <img id="flag" alt="Country Flag">
-
+    <h2>Guess the Country by Shape 🌍</h2>
+    <svg id="map"></svg>
     <div id="question-number"></div>
-
     <div id="options"></div>
-
-    <div id="final-score"></div>
-
+    <h3 id="final-score"></h3>
     <button id="restart" style="display:none;" onclick="startQuiz()">Restart Quiz</button>
 </div>
 
 <script>
-/* -------- CONFIG -------- */
+// --- CONFIG ---
 const QUESTIONS = 10;
-
+let countries = [];
+let quizCountries = [];
 let index = 0;
 let score = 0;
-let quizCountries = [];
 
-/* -------- COUNTRY DATA -------- */
-const countries = [
-    { name: "France", flag: "https://flagcdn.com/w320/fr.png" },
-    { name: "Germany", flag: "https://flagcdn.com/w320/de.png" },
-    { name: "Japan", flag: "https://flagcdn.com/w320/jp.png" },
-    { name: "Brazil", flag: "https://flagcdn.com/w320/br.png" },
-    { name: "Canada", flag: "https://flagcdn.com/w320/ca.png" },
-    { name: "India", flag: "https://flagcdn.com/w320/in.png" },
-    { name: "Italy", flag: "https://flagcdn.com/w320/it.png" },
-    { name: "Australia", flag: "https://flagcdn.com/w320/au.png" },
-    { name: "Mexico", flag: "https://flagcdn.com/w320/mx.png" },
-    { name: "South Africa", flag: "https://flagcdn.com/w320/za.png" }
-];
+// --- LOAD WORLD SHAPE DATA ---
+d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json").then(world => {
+    const geo = topojson.feature(world, world.objects.countries);
+    // Filter out unwanted entries like UN
+    countries = geo.features.filter(c => {
+        const name = c.properties.name;
+        return name && name !== "United Nations";
+    });
+    startQuiz();
+});
 
-/* -------- START QUIZ -------- */
+// --- START QUIZ ---
 function startQuiz() {
-    index = 0;
     score = 0;
-    quizCountries = shuffle([...countries]).slice(0, QUESTIONS);
+    index = 0;
+    quizCountries = d3.shuffle([...countries]).slice(0, QUESTIONS);
 
-    document.getElementById("final-score").textContent = "";
     document.getElementById("restart").style.display = "none";
+    document.getElementById("final-score").textContent = "";
 
     loadQuestion();
 }
 
-/* -------- LOAD QUESTION -------- */
+// --- LOAD QUESTION ---
 function loadQuestion() {
-    const current = quizCountries[index];
+    const c = quizCountries[index];
 
     document.getElementById("question-number").textContent =
         `Question ${index + 1} of ${QUESTIONS}`;
 
-    document.getElementById("flag").src = current.flag;
-
-    createOptions(current);
+    drawCountry(c);
+    createOptions(c);
 }
 
-/* -------- CREATE OPTIONS -------- */
+// --- DRAW COUNTRY SHAPE ---
+function drawCountry(country) {
+    const svg = d3.select("#map");
+    svg.selectAll("*").remove();
+
+    const projection = d3.geoNaturalEarth1().fitSize([350, 250], country);
+    const path = d3.geoPath().projection(projection);
+
+    svg.append("path")
+        .attr("d", path(country))
+        .attr("fill", "#95a5a6")
+        .attr("stroke", "#34495e")
+        .attr("stroke-width", 1.5);
+}
+
+// --- CREATE OPTIONS ---
 function createOptions(correctCountry) {
     const optionsDiv = document.getElementById("options");
     optionsDiv.innerHTML = "";
 
-    const incorrect = shuffle(
-        countries.filter(c => c.name !== correctCountry.name)
-    ).slice(0, 3);
+    let incorrect = d3.shuffle(countries.filter(c => c !== correctCountry))
+                     .slice(0, 3);
 
-    const options = shuffle([correctCountry, ...incorrect]);
+    let allOptions = d3.shuffle([correctCountry, ...incorrect]);
 
-    options.forEach(opt => {
-        const btn = document.createElement("button");
+    allOptions.forEach(opt => {
+        let btn = document.createElement("button");
         btn.className = "option-btn";
-        btn.textContent = opt.name;
-        btn.onclick = () => handleAnswer(btn, opt.name, correctCountry.name);
+        btn.textContent = opt.properties.name;
+
+        btn.onclick = () => handleAnswer(btn, opt.properties.name, correctCountry.properties.name);
+
         optionsDiv.appendChild(btn);
     });
 }
 
-/* -------- HANDLE ANSWER -------- */
+// --- HANDLE ANSWER ---
 function handleAnswer(button, chosen, correct) {
-    const buttons = document.querySelectorAll(".option-btn");
-    buttons.forEach(b => b.disabled = true);
+    const optionsDiv = document.getElementById("options");
+
+    [...optionsDiv.querySelectorAll("button")].forEach(b => b.disabled = true);
 
     if (chosen === correct) {
         button.classList.add("correct");
         score++;
     } else {
         button.classList.add("incorrect");
-        [...buttons]
+
+        [...optionsDiv.querySelectorAll("button")]
             .find(b => b.textContent === correct)
             .classList.add("correct");
     }
 
     setTimeout(() => {
         index++;
-        index >= QUESTIONS ? finishQuiz() : loadQuestion();
+        if (index >= QUESTIONS) finishQuiz();
+        else loadQuestion();
     }, 1200);
 }
 
-/* -------- FINISH QUIZ -------- */
+// --- FINISH QUIZ ---
 function finishQuiz() {
     document.getElementById("final-score").textContent =
         `Final Score: ${score} / ${QUESTIONS}`;
 
-    document.getElementById("restart").style.display = "inline-block";
-    document.getElementById("flag").src = "";
-    document.getElementById("options").innerHTML = "";
+    document.getElementById("restart").style.display = "block";
+
+    d3.select("#map").selectAll("*").remove();
     document.getElementById("question-number").textContent = "";
+    document.getElementById("options").innerHTML = "";
 }
-
-/* -------- SHUFFLE -------- */
-function shuffle(array) {
-    return array.sort(() => Math.random() - 0.5);
-}
-
-/* -------- AUTO START -------- */
-startQuiz();
 </script>
-
 </body>
 </html>
